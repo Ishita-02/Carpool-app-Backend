@@ -11,16 +11,21 @@ app.use(cors());
 dotenv.config();
 
 // Mongoose schemas
-const userSchema = new mongoose.Schema({
-    username: {type: String},
+  const userSchema = new mongoose.Schema({
+    username: {type: String, required: true},
+    name: String,
     password: String,
+    gender: String,
+    age: Number ,
     ridesBooked: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bookings' }]
   });
   
   const bookingSchema = new mongoose.Schema({
-    bookingId: String,
     to: String,
     from: String,
+    mode: String,
+    date: Date,
+    time: String
   });
   
   // Mongoose models
@@ -47,16 +52,16 @@ const authenticateJwt = (req, res, next) => {
 };
 
 // Connection to MongoDB
-mongoose.connect('mongodb+srv://kirattechnologies:iRbi4XRDdM7JMMkl@cluster0.e95bnsi.mongodb.net/Carpool-app');
+mongoose.connect('mongodb+srv://ishitagrawal0207:lpdNBhlHhN8cuoER@cluster0.hg0xkl5.mongodb.net/Carpool-app');
 
 // Routes
 app.post('/user/signup', (req, res) => {
-    const { username, password } = req.body;
+    const { username } = req.body;
     function callback(user) {
       if (user) {
         res.status(403).json({ message: 'User already exists' });
       } else {
-        const obj = { username: username, password: password };
+        const obj = new User(req.body);
         const newUser= new User(obj);
         newUser.save();
         const token = jwt.sign({ username, role: 'user' }, SECRET, { expiresIn: '1h' });
@@ -76,6 +81,67 @@ app.post('/user/login', async (req, res) => {
     else {
         res.status(403).json({ message : 'Invalid username or password'});
     }
+});
+
+app.post('/user/createBooking', authenticateJwt, async (req, res) => {
+  const booking = new Bookings(req.body);
+  await booking.save();
+  res.json({ message: 'Booking created successfully', bookingId: booking.id });
+});
+
+app.put('/user/bookings/:bookingId', authenticateJwt, async (req, res) => {
+  const booking = await Bookings.findByIdAndUpdate(req.params.bookingId, req.body, {new: true});
+  if(booking) {
+    res.json({ message : "Booking updated successfully"});
+  }
+  else {
+    res.status(404).json({ message: "Booking not found "});
+  }
+});
+
+app.get('/user/getBookings', authenticateJwt, async(req, res) => {
+  const courses = await Bookings.find({});
+  res.json({courses});
+});
+
+app.delete('/user/bookings/:bookingId', authenticateJwt, async(req, res) => {
+  const id = req.params.bookingId;
+  const bookingIndex = await Bookings.findById(id);
+  if(bookingIndex) {
+    await Bookings.deleteOne(bookingIndex);
+    res.json({ message: "Booking deleted"});
+  }
+  else {
+    res.status(403).json({message: "Booking not found"});
+  }
+});
+
+app.post('/user/bookRide/:bookingId', authenticateJwt, async(req, res) => {
+  const ride = await Bookings.findById(req.params.bookingId);
+  if(ride) {
+    const user = await User.findOne({username: req.user.username});
+    if(user) {
+      user.ridesBooked.push(ride);
+      await user.save();
+      res.json({message: 'Ride booked successfully'});
+    }
+    else {
+      res.status(403).json({message: "User not found"});
+    }
+  }
+  else {
+    res.status(404).json({message: "Booking not found"});
+  }
+});
+
+app.get('/user/getBookedRides', authenticateJwt, async(req, res) =>{
+  const user = await User.findOne({ username: req.user.username }).populate('ridesBooked');
+  if(user) {
+    res.json({ridesBooked: user.ridesBooked || []});
+  }
+  else {
+    res.status(403).json({message: "User not found"});
+  }
 });
 
 app.listen(3000, () => console.log('Server running on port 3000'));
