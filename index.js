@@ -144,4 +144,23 @@ app.get('/user/getBookedRides', authenticateJwt, async(req, res) =>{
   }
 });
 
+app.get('/user/searchRide/:to/:from', authenticateJwt, async (req, res) => {
+  try {
+    const to = req.params.to;
+    const from = req.params.from;
+
+    const rides = await Bookings.find({ to, from });
+
+    if (rides.length > 0) {
+      res.json({ rides });
+    } else {
+      res.status(404).json({ message: "No rides found for the specified locations." });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "An error occurred while searching for rides." });
+  }
+});
+
+
 app.listen(3000, () => console.log('Server running on port 3000'));
